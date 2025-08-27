@@ -176,9 +176,10 @@
     </div>
 
     <div id="chat-area">
-        <div id="chatbox"></div>
         <textarea id="question" rows="3" placeholder="Type your question here..."></textarea>
         <button id="submitBtn">Submit</button>
+        <div id="answerArea" style="margin: 15px 0; padding: 12px; background: #e8f5e9; border-radius: 12px; color: #2e7d32; font-weight: 500; display: none;"></div>
+        <div id="chatbox"></div>
     </div>
 </div>
 
@@ -192,32 +193,47 @@
     const questionInput = document.getElementById("question");
     const submitBtn = document.getElementById("submitBtn");
     const fileInput = document.getElementById("fileInput");
+    const answerArea = document.getElementById("answerArea");
 
-    // Utility: add message with optional timestamp and collapsible content
-    function addMessage(sender, text, collapsible=false) {
-        if(collapsible) {
-            const button = document.createElement("button");
-            button.className = "collapsible";
-            button.innerText = sender.toUpperCase() + ": Click to expand answer";
-            const content = document.createElement("div");
-            content.className = "content";
-            content.innerText = text;
-            button.addEventListener("click", function() {
-                content.style.display = content.style.display === "block" ? "none" : "block";
-            });
-            chatbox.appendChild(button);
-            chatbox.appendChild(content);
-        } else {
-            const div = document.createElement("div");
-            div.className = `message ${sender}`;
-            div.innerText = text;
-            const timestamp = document.createElement("span");
-            timestamp.className = "timestamp";
-            const now = new Date();
-            timestamp.innerText = now.getHours() + ":" + now.getMinutes().toString().padStart(2,'0');
-            div.appendChild(timestamp);
-            chatbox.appendChild(div);
-        }
+    // Store chat history
+    let chatHistory = [];
+
+    // Utility: add message to chat history and update chatbox
+    function addMessage(sender, text) {
+        chatHistory.push({ sender, text });
+        renderChatHistory();
+    }
+
+    // Render all chat history below the answer area
+    function renderChatHistory() {
+        chatbox.innerHTML = "";
+        chatHistory.forEach((msg, idx) => {
+            if (msg.sender === "bot") {
+                // Show bot answers as collapsible with prefix in chat history
+                const button = document.createElement("button");
+                button.className = "collapsible";
+                button.innerText = "BOT: Click to expand answer";
+                const content = document.createElement("div");
+                content.className = "content";
+                content.innerText = msg.text;
+                button.addEventListener("click", function() {
+                    content.style.display = content.style.display === "block" ? "none" : "block";
+                });
+                chatbox.appendChild(button);
+                chatbox.appendChild(content);
+            } else {
+                // User/system messages as before
+                const div = document.createElement("div");
+                div.className = `message ${msg.sender}`;
+                div.innerText = msg.text;
+                const timestamp = document.createElement("span");
+                timestamp.className = "timestamp";
+                const now = new Date();
+                timestamp.innerText = now.getHours() + ":" + now.getMinutes().toString().padStart(2,'0');
+                div.appendChild(timestamp);
+                chatbox.appendChild(div);
+            }
+        });
         chatbox.scrollTop = chatbox.scrollHeight;
     }
 
@@ -293,7 +309,7 @@
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": "Bearer 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"
+                    "Authorization": "Bearer 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"
                 },
                 body: JSON.stringify({
                     model:"gpt-3.5-turbo",
@@ -302,9 +318,23 @@
                 })
             });
             const data = await response.json();
-            const answer = data.choices[0].message.content;
-            addMessage("bot", answer, true); // collapsible answer
+            if (data.choices && Array.isArray(data.choices) && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+                const answer = data.choices[0].message.content;
+                answerArea.style.display = "block";
+                answerArea.innerText = answer;
+                addMessage("bot", answer);
+            } else if (data.error && data.error.message) {
+                answerArea.style.display = "block";
+                answerArea.innerText = "❌ OpenAI API error: " + data.error.message;
+                addMessage("system", "❌ OpenAI API error: " + data.error.message);
+            } else {
+                answerArea.style.display = "block";
+                answerArea.innerText = "❌ Unexpected API response.";
+                addMessage("system", "❌ Unexpected API response.");
+            }
         } catch(err){
+            answerArea.style.display = "block";
+            answerArea.innerText = "❌ Error calling OpenAI API: " + err;
             addMessage("system", "❌ Error calling OpenAI API: " + err);
         }
 
