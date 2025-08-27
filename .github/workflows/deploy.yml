@@ -57,8 +57,11 @@ jobs:
           EOL
 
       - name: Build static site (optional)
-        run: cp -r * dist/
-
+        run: |
+          shopt -s extglob
+          mkdir -p dist
+          cp -r !(dist) dist/
+          
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
